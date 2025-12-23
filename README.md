@@ -1,413 +1,314 @@
-# BlackRoad Deploy
+# BlackRoad Deploy 🚀
 
-**Self-hosted deployment platform** - Your own Railway/Heroku alternative.
+Railway-like deployment system for your Raspberry Pis and Droplets.
 
-Deploy apps to your infrastructure (DigitalOcean + Raspberry Pi) with Docker, Cloudflare Tunnel, and full control.
+Deploy multi-language applications (Node.js, Python, Go, Rust) with automatic buildpack detection, GitHub webhooks, and DNS management.
 
-## Why BlackRoad Deploy?
+## Features
 
-✅ **Full Control** - Own your infrastructure, no vendor lock-in
-✅ **Cost Effective** - ~$12/month vs $20-100+ on Railway
-✅ **Unlimited Projects** - No artificial limits
-✅ **Free Custom Domains** - Via Cloudflare
-✅ **Simple CLI** - `blackroad deploy` and you're live
-✅ **Works Anywhere** - Cloudflare Tunnel works behind NAT/firewall
+✨ **Multi-Language Support**
+- Node.js (auto-detects package.json)
+- Python (requirements.txt, pyproject.toml, Pipfile)
+- Go (go.mod)
+- Rust (Cargo.toml)
+- Docker (Dockerfile)
+
+🔄 **Automatic Deployments**
+- GitHub webhook integration
+- Push to deploy
+- Automatic rebuilds on code changes
+
+🌐 **DNS Management**
+- Cloudflare DNS automation
+- Point domains to your apps
+- Automatic SSL/TLS with Caddy
+
+🎯 **Multiple Targets**
+- aria64 (Raspberry Pi)
+- shellfish (DigitalOcean Droplet)
+- alice (Raspberry Pi)
+- lucidia (Raspberry Pi)
+
+## Quick Start
+
+### 1. Install
+
+```bash
+cd ~/blackroad-deploy
+chmod +x br-deploy scripts/*.sh scripts/*.py
+```
+
+### 2. Deploy Your First App
+
+```bash
+# Deploy a Node.js app
+./br-deploy deploy ./my-node-app aria64
+
+# Deploy a Python app to Shellfish
+./br-deploy deploy ./my-python-api shellfish
+
+# Deploy with custom name
+./br-deploy deploy ./my-app aria64 custom-name
+```
+
+### 3. Manage Apps
+
+```bash
+# List deployed apps
+./br-deploy list aria64
+
+# View logs
+./br-deploy logs my-app aria64
+
+# Restart an app
+./br-deploy restart my-app aria64
+
+# Check server status
+./br-deploy status shellfish
+```
+
+### 4. DNS Management
+
+```bash
+# Point domain to your app
+./scripts/dns-manager.sh set myapp.blackroad.io aria64
+
+# List all DNS records
+./scripts/dns-manager.sh list
+
+# Delete a record
+./scripts/dns-manager.sh delete myapp.blackroad.io
+```
+
+### 5. GitHub Webhooks (Auto-Deploy)
+
+```bash
+# Add a repo to auto-deploy
+./scripts/webhook-manager.sh add my-repo aria64 main
+
+# Start the webhook server
+./scripts/webhook-manager.sh start
+
+# Check status
+./scripts/webhook-manager.sh status
+
+# View logs
+tail -f ~/.blackroad-deploy/webhook.log
+```
+
+Then add webhook to GitHub:
+- URL: `http://YOUR_IP:9000/webhook`
+- Secret: `blackroad-deploy-secret`
+- Content type: `application/json`
+- Events: Just the push event
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Developer                                      │
-│  ├─ blackroad deploy                            │
-│  └─ Pushes Docker image to ghcr.io             │
-└────────────┬────────────────────────────────────┘
-             │
-             ▼
-┌─────────────────────────────────────────────────┐
-│  Cloudflare Tunnel                              │
-│  ├─ deploy-api.blackroad.systems (API)         │
-│  └─ *.blackroad.systems (Apps)                 │
-└────────────┬────────────────────────────────────┘
-             │
-             ▼
-┌─────────────────────────────────────────────────┐
-│  Deployment Server (DigitalOcean/Pi)           │
-│  ├─ API: Node.js + PostgreSQL                  │
-│  ├─ Docker: Runs containers                    │
-│  └─ Caddy: Reverse proxy                       │
-└─────────────────────────────────────────────────┘
+┌─────────────────┐
+│  Your Computer  │
+│   br-deploy     │
+└────────┬────────┘
+         │
+         ├──────────────┐
+         │              │
+    ┌────▼────┐    ┌────▼────────┐
+    │  aria64 │    │  shellfish  │
+    │   Pi    │    │   Droplet   │
+    └────┬────┘    └────┬────────┘
+         │              │
+    ┌────▼────────────────▼────┐
+    │   Caddy Reverse Proxy    │
+    │   (Auto SSL/TLS)         │
+    └──────────┬────────────────┘
+               │
+         ┌─────▼─────┐
+         │   Apps    │
+         │ Port 3XXX │
+         └───────────┘
 ```
 
-## Quick Start
+## Directory Structure
 
-### 1. Install CLI
+```
+~/blackroad-deploy/
+├── br-deploy              # Main CLI tool
+├── deploy.sh              # Original deploy script
+├── README.md              # This file
+├── dockerfiles/           # Language-specific Dockerfiles
+│   ├── Dockerfile.nodejs
+│   ├── Dockerfile.python
+│   ├── Dockerfile.go
+│   └── Dockerfile.rust
+└── scripts/
+    ├── dns-manager.sh     # Cloudflare DNS management
+    ├── webhook-server.py  # GitHub webhook server
+    └── webhook-manager.sh # Webhook configuration
+```
+
+## Environment Variables
 
 ```bash
-npm install -g blackroad-cli
-# or
-yarn global add blackroad-cli
+# Cloudflare (for DNS management)
+export CF_API_TOKEN="your-token"
+export CF_ZONE_ID="your-zone-id"
+
+# Webhook server
+export WEBHOOK_PORT=9000
+export WEBHOOK_SECRET="your-secret"
 ```
 
-### 2. Login
+## Examples
+
+### Deploy a Node.js Express App
 
 ```bash
-blackroad login
+# Your app structure:
+# my-api/
+#   ├── package.json
+#   ├── index.js
+#   └── ...
+
+./br-deploy deploy ./my-api shellfish
 ```
 
-### 3. Initialize Project
+### Deploy a Python FastAPI App
 
 ```bash
-cd my-app
-blackroad init
+# Your app structure:
+# my-api/
+#   ├── requirements.txt
+#   ├── app.py (or main.py)
+#   └── ...
+
+./br-deploy deploy ./my-api aria64 my-api
 ```
 
-This creates `blackroad.json`:
-
-```json
-{
-  "name": "my-app",
-  "buildCommand": "npm run build",
-  "startCommand": "npm start",
-  "port": 3000,
-  "env": {}
-}
-```
-
-### 4. Deploy
+### Deploy with Auto-Deploy from GitHub
 
 ```bash
-blackroad deploy
+# 1. Configure auto-deploy
+./scripts/webhook-manager.sh add my-repo aria64 main
+
+# 2. Start webhook server
+./scripts/webhook-manager.sh start
+
+# 3. Add webhook in GitHub repo settings:
+#    - Payload URL: http://YOUR_IP:9000/webhook
+#    - Content type: application/json
+#    - Secret: blackroad-deploy-secret
+#    - Events: push
+
+# 4. Push to GitHub - automatically deploys!
+git push origin main
 ```
 
-Your app will be live at `https://my-app.blackroad.systems`
-
-## CLI Commands
+### Set Up Custom Domain
 
 ```bash
-# Initialize project
-blackroad init
+# 1. Deploy your app
+./br-deploy deploy ./my-app shellfish
 
-# Login
-blackroad login
+# 2. Note the port (e.g., 3150)
 
-# Deploy
-blackroad deploy
-blackroad deploy -n my-app -i ghcr.io/user/image:tag
+# 3. Set up DNS
+./scripts/dns-manager.sh set myapp.blackroad.io shellfish
 
-# List deployments
-blackroad list
-blackroad ls
-
-# View logs
-blackroad logs my-app
-blackroad logs my-app -f  # Follow logs
-blackroad logs my-app -n 500  # Last 500 lines
-
-# Environment variables
-blackroad env set my-app DATABASE_URL=postgres://...
-blackroad env get my-app
-blackroad env delete my-app DATABASE_URL
-
-# Restart deployment
-blackroad restart my-app
-
-# Delete deployment
-blackroad delete my-app
-blackroad rm my-app -f  # Skip confirmation
+# 4. Configure Caddy reverse proxy (on target server)
+# Add to Caddyfile:
+# myapp.blackroad.io {
+#     reverse_proxy localhost:3150
+# }
 ```
-
-## Infrastructure Setup
-
-### Prerequisites
-
-- DigitalOcean droplet (or any VPS)
-- Cloudflare account with domain
-- Docker installed on server
-
-### 1. Set Up Deployment Server
-
-```bash
-# SSH to your server
-ssh root@159.65.43.12
-
-# Clone repo
-git clone https://github.com/blackroad-os/blackroad-deploy
-cd blackroad-deploy
-
-# Install dependencies
-cd deployment-api
-npm install
-
-# Set up PostgreSQL
-sudo apt-get install postgresql
-sudo -u postgres createdb blackroad_deploy
-
-# Configure environment
-cp .env.example .env
-nano .env  # Add your credentials
-
-# Run migrations
-npm run db:migrate
-
-# Start API
-npm start
-```
-
-### 2. Set Up Cloudflare Tunnel
-
-```bash
-# Run setup script
-cd ../scripts
-chmod +x setup-tunnel.sh
-./setup-tunnel.sh
-```
-
-This will:
-- Install cloudflared
-- Create tunnel
-- Configure DNS
-- Start tunnel service
-
-See [TUNNEL_SETUP.md](./TUNNEL_SETUP.md) for detailed instructions.
-
-### 3. Set Up Raspberry Pi (Optional)
-
-```bash
-# SSH to Pi
-ssh alice@192.168.4.49
-
-# Copy and run setup script
-scp scripts/setup-pi-tunnel.sh alice@192.168.4.49:~/
-ssh alice@192.168.4.49
-chmod +x setup-pi-tunnel.sh
-./setup-pi-tunnel.sh
-```
-
-## Configuration
-
-### Deployment API (.env)
-
-```bash
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=blackroad_deploy
-DB_USER=postgres
-DB_PASSWORD=your_password
-
-PORT=3000
-
-CF_API_TOKEN=your_cloudflare_token
-CF_ZONE_ID=your_zone_id
-
-DOCKER_HOST=unix:///var/run/docker.sock
-```
-
-### Cloudflare Tunnel (config.yml)
-
-```yaml
-tunnel: <TUNNEL-ID>
-credentials-file: /root/.cloudflared/<TUNNEL-ID>.json
-
-ingress:
-  - hostname: deploy-api.blackroad.systems
-    service: http://localhost:3000
-
-  - hostname: "*.blackroad.systems"
-    service: http://localhost:8080
-
-  - service: http_status:404
-```
-
-## API Reference
-
-### Authentication
-
-All API endpoints (except `/health` and `/api/auth/*`) require authentication:
-
-```
-Authorization: Bearer <API_KEY>
-```
-
-### Endpoints
-
-#### `POST /api/auth/register`
-Register new user and get API key.
-
-#### `POST /api/auth/login`
-Login and get API key.
-
-#### `GET /api/deployments`
-List all deployments.
-
-#### `POST /api/deployments`
-Create new deployment.
-
-```json
-{
-  "name": "my-app",
-  "image": "ghcr.io/user/my-app:latest",
-  "env": {
-    "DATABASE_URL": "postgres://..."
-  },
-  "port": 3000
-}
-```
-
-#### `GET /api/deployments/:name`
-Get deployment details.
-
-#### `DELETE /api/deployments/:name`
-Delete deployment.
-
-#### `POST /api/deployments/:name/restart`
-Restart deployment.
-
-#### `GET /api/logs/:name`
-Get container logs.
-
-#### `GET /api/env/:name`
-Get environment variables.
-
-#### `POST /api/env/:name`
-Set environment variable.
-
-```json
-{
-  "key": "DATABASE_URL",
-  "value": "postgres://..."
-}
-```
-
-## Docker Images
-
-Your apps should be containerized. Example `Dockerfile`:
-
-```dockerfile
-FROM node:20-alpine
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm ci --only=production
-
-COPY . .
-RUN npm run build
-
-EXPOSE 3000
-
-CMD ["npm", "start"]
-```
-
-Build and push to GitHub Container Registry:
-
-```bash
-docker build -t ghcr.io/your-username/my-app:latest .
-docker push ghcr.io/your-username/my-app:latest
-```
-
-Or let `blackroad deploy` handle it automatically.
-
-## Cost Breakdown
-
-### DigitalOcean Droplet
-- **Basic Droplet**: $6/month (1GB RAM, 1 vCPU)
-- **Better**: $12/month (2GB RAM, 2 vCPU)
-- **Production**: $24/month (4GB RAM, 2 vCPU)
-
-### Cloudflare
-- **Free**: Tunnel, DNS, SSL, DDoS protection
-- **Optional**: Additional features
-
-### Total: ~$6-24/month
-vs Railway: $20-100+/month (limited projects)
-
-## Raspberry Pi Support
-
-Run deployments on Raspberry Pi for even lower costs:
-
-```bash
-# Run setup on Pi
-./scripts/setup-pi-tunnel.sh
-
-# Deploy to Pi
-blackroad deploy -n pi-app
-```
-
-Your Pi can host:
-- Development/staging environments
-- Personal projects
-- Internal tools
-- IoT services
 
 ## Troubleshooting
 
-### Tunnel Not Working
-
+### Check deployment status
 ```bash
-# Check tunnel status
-cloudflared tunnel info blackroad-deploy
+./br-deploy list aria64
+./br-deploy logs my-app aria64
+```
 
-# Check service
-systemctl status cloudflared
+### Check server resources
+```bash
+./br-deploy status aria64
+```
+
+### Webhook not working?
+```bash
+# Check if server is running
+./scripts/webhook-manager.sh status
 
 # View logs
-journalctl -u cloudflared -f
+tail -f ~/.blackroad-deploy/webhook.log
+
+# Restart server
+./scripts/webhook-manager.sh stop
+./scripts/webhook-manager.sh start
 ```
 
-### Docker Issues
+## Advanced Usage
+
+### Custom Dockerfile
+
+If you have a Dockerfile, it will be used automatically:
 
 ```bash
-# Check Docker
-docker ps
-docker logs <container-id>
-
-# Restart Docker
-systemctl restart docker
+./br-deploy deploy ./my-docker-app aria64
 ```
 
-### Database Connection
+### Environment Variables
+
+Create a `.env` file in your app directory or pass via Docker:
 
 ```bash
-# Test PostgreSQL
-psql -U postgres -d blackroad_deploy
-
-# Check running containers
-docker ps | grep postgres
+# Modify br-deploy script to load .env
+# Or use docker run -e flags
 ```
 
-## Security
+### Multiple Environments
 
-- ✅ API key authentication
-- ✅ Cloudflare Tunnel (no open ports)
-- ✅ HTTPS everywhere
-- ✅ Environment variables encrypted at rest
-- ✅ Container isolation
-- ✅ DDoS protection via Cloudflare
+```bash
+# Production on shellfish
+./br-deploy deploy ./my-app shellfish my-app-prod
 
-## Roadmap
+# Staging on aria64
+./br-deploy deploy ./my-app aria64 my-app-staging
+```
 
-- [ ] Web dashboard (Cloudflare Pages)
-- [ ] GitHub Actions integration
-- [ ] Auto-scaling
-- [ ] Multi-region deployments
-- [ ] Database provisioning
+## Supported Frameworks
+
+- **Node.js**: Express, Fastify, NestJS, Next.js, etc.
+- **Python**: Flask, FastAPI, Django, etc.
+- **Go**: net/http, Gin, Echo, Fiber, etc.
+- **Rust**: Actix, Rocket, Axum, etc.
+
+## Ports
+
+- 3000-3099: Node.js apps
+- 3100-3199: Python apps
+- 3200-3299: Go apps
+- 3300-3399: Rust apps
+- 8000: LLM service
+- 9000: Webhook server
+- 80/443: Caddy reverse proxy
+
+## Tips
+
+1. **Health Checks**: Add a `/health` endpoint to your apps
+2. **Logs**: Use `./br-deploy logs <app> <target>` to debug
+3. **DNS**: Always set DNS after deploying
+4. **Webhooks**: Great for CI/CD automation
+5. **Caddy**: Use for automatic HTTPS
+
+## What's Next?
+
+- [ ] Add database provisioning
+- [ ] Environment variable management UI
 - [ ] Metrics and monitoring
-- [ ] Automatic SSL for custom domains
-- [ ] Deploy from Git (auto-deploy on push)
-
-## Contributing
-
-Pull requests welcome! See [ARCHITECTURE.md](./ARCHITECTURE.md) for technical details.
-
-## License
-
-MIT
-
-## Support
-
-- GitHub Issues: https://github.com/blackroad-os/blackroad-deploy/issues
-- Email: blackroad.systems@gmail.com
+- [ ] Load balancing across Pis
+- [ ] Auto-scaling based on traffic
 
 ---
 
-Built with ❤️ by BlackRoad Systems
+Made with ❤️ for BlackRoad OS
